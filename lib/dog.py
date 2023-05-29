@@ -4,8 +4,8 @@ CONN = sqlite3.connect('lib/dogs.db')
 CURSOR = CONN.cursor()
 
 class Dog:
-    def __init__(self, name,  breed):
-        self.id = None
+    def __init__(self, name,  breed, id = None):
+        self.id = id
         self.name = name 
         self.breed = breed 
 
@@ -19,6 +19,7 @@ class Dog:
             )
         """
         CURSOR.execute(sql)
+        CONN.commit()
     
     @classmethod
     def drop_table(cls):
@@ -26,6 +27,7 @@ class Dog:
             DROP TABLE IF EXISTS dogs
         """
         CURSOR.execute(sql)
+        CONN.commit()
 
     def save(self):
         sql = """
@@ -36,9 +38,10 @@ class Dog:
         CONN.commit()
         self.id = CURSOR.execute("SELECT last_insert_rowid() FROM dogs").fetchone()[0]
 
+
     @classmethod
     def create(cls, name, breed):
-        dog = Dog(name, breed)
+        dog = cls(name, breed)
         dog.save()
         return dog
     
@@ -57,6 +60,8 @@ class Dog:
             LIMIT 1
         """
         dog = CURSOR.execute(sql, (name,)).fetchone()
+        if not dog: 
+            return None
         return cls.new_from_db(dog)
     
     @classmethod
@@ -70,7 +75,7 @@ class Dog:
         return cls.all
     
     @classmethod
-    def find_by_id (cls, id):
+    def find_by_id(cls, id):
         sql = """
             SELECT * 
             FROM dogs
@@ -78,4 +83,30 @@ class Dog:
             LIMIT 1
         """
         dog = CURSOR.execute(sql, (id,)).fetchone()
+        if not dog:
+            return None
         return cls.new_from_db(dog)
+    
+    @classmethod
+    def find_or_create_by(cls, name, breed):
+        sql = """
+            SELECT * 
+            FROM dogs
+            WHERE (name, breed) = (?, ?) 
+            LIMIT 1
+        """
+        dog = CURSOR.execute(sql, (name, breed)).fetchone()
+        if dog: 
+            return cls.new_from_db(dog)
+        else: 
+            return cls.create(name, breed)
+        
+    def update(self):
+        sql = """
+            UPDATE dogs 
+            SET name = ?,
+                breed = ? 
+            WHERE id = ?
+        """
+        CURSOR.execute(sql, (self.name, self.breed, self.id))
+        CONN.commit()
